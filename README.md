@@ -1,30 +1,56 @@
-# React + TypeScript + Vite
+# Wink Front-End Integration Documentation
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Introduction
 
-Currently, two official plugins are available:
+This documentation outlines the steps required to integrate Wink Login into a frontend application built with React and TypeScript. It is based on [Wink's official guide](https://docs.wink.cloud/docs/front-end-integration) and demonstrates implementing a login/logout button.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Key Features
 
-## Expanding the ESLint configuration
+- Utilization of `useEffect` and `customHooks` in React.
+- Login button that checks the authentication status of the user.
+- Display of user information and logout button if the user is already authenticated.
+- Enrollment and recognition process for unauthenticated users.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## Project Setup
 
-- Configure the top-level `parserOptions` property like this:
+### Wink Styles
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
+- Wink styles are included in the `index.css` file.
+
+### Global Variables
+
+- Declaration of `WinkLogin` and `getWinkLoginClient` as global variables.
+
+### Components
+
+- Reusable button encapsulating the login/logout logic.
+- Custom hook for initialization and handling user information.
+
+## Directory Structure
+
+- `public/`: Contains `silent-check-sso.html` and `wink.module.js`.
+- `src/`: Source code of the React application.
+
+## Usage Guide
+
+### Installation
+
+Install the project dependencies with the following command:
+
+```javascript dark
+npm install
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+### Execution
+
+Start the application in development mode:
+
+```javascript dark
+npm run dev
+```
+
+Access the application at `http://localhost:3000`.
+
+## Conclusion
+
+This document provides an overview of integrating Wink Login into a React + Typescript application. Follow the mentioned steps for proper implementation.

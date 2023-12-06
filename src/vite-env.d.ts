@@ -4,9 +4,7 @@ export {};
 
 declare global {
   interface Window {
-    iFrameResize: any;
     WinkLogin: any;
-    winkEnvValues: any;
     getWinkLoginClient: (config: any) => any;
   }
 }
