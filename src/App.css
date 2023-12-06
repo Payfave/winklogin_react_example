@@ -1,0 +1,17 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.welcome-message {
+  margin: 20px 0;
+  text-align: center;
+  font-size: 1.5em;
+}
+
+.json-view-container {
+  text-align: left;
+  margin-bottom: 20px;
+}
