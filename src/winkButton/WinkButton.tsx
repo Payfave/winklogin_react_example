@@ -1,7 +1,10 @@
 import SemicolonImage from './semicolon-white.svg';
 
-interface WinkLoginButtonProps {
+interface WinkButtonProps {
   onClick?: () => void;
+  text?: string;
+}
+interface WinkLoginButtonProps extends WinkButtonProps {
   type: 'login' | 'logout';
 }
 
@@ -9,7 +12,7 @@ const WinkLoginButton: React.FC<WinkLoginButtonProps> = ({ onClick, type }) => {
   return (
     <button
       id='wink-oauth-button'
-      className='wink-oauth-button wink-oauth-button--primary'
+      className='wink-oauth-button wink-oauth-button--primary button'
       onClick={onClick}
     >
       <img src={SemicolonImage} alt='Wink' />
@@ -18,4 +21,16 @@ const WinkLoginButton: React.FC<WinkLoginButtonProps> = ({ onClick, type }) => {
   );
 };
 
-export default WinkLoginButton;
+const WinkButton: React.FC<WinkButtonProps> = ({ onClick, text }) => {
+  return (
+    <button
+      id='wink-oauth-button'
+      className='wink-oauth-button wink-oauth-button--primary button'
+      onClick={onClick}
+    >
+      {text}
+    </button>
+  );
+};
+
+export { WinkLoginButton, WinkButton };

@@ -1,87 +1,264 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface UserData {
-  acr: string;
-  allowed_origins: string[];
-  aud: string;
-  azp: string;
+import { useSnackbar } from 'notistack';
+
+import KeycloakJs, {
+  KeycloakConfig,
+  KeycloakError,
+  KeycloakLoginOptions,
+  KeycloakLogoutOptions,
+  KeycloakTokenParsed,
+} from 'keycloak-js';
+
+type WinkInitParams = {
+  onFailure?(error: unknown): void;
+  onSuccess?(): void | Promise<void>;
+};
+
+type WinkLoginParams = KeycloakLoginOptions & {
+  onFailure?(error: unknown): void;
+};
+
+type WinkLogoutParams = KeycloakLogoutOptions & {
+  onFailure?(error: unknown): void;
+};
+
+type WinkKeycloakConfig = KeycloakConfig & {
+  onAuthErrorFailure?(error: KeycloakError): void;
+  loggingEnabled?: boolean;
+};
+
+type TokenData = {
+  firstName: string;
+  lastName: string;
+  contactNo: string;
   email: string;
-  email_verified: boolean;
-  exp: number;
-  family_name: string;
-  given_name: string;
-  iat: number;
-  iss: string;
-  jti: string;
-  nonce: string;
-  oid: string;
-  phone_number: string;
-  preferred_username: string;
-  realm_access: {
-    roles: string[];
-  };
-  resource_access: {
-    account: Record<string, unknown>;
-  };
-  scope: string;
-  session_state: string;
-  sid: string;
-  sub: string;
-  typ: string;
+  winkTag: string;
+  winkToken: string;
+  dateOfBirth: string;
+  expiryTime: string;
+};
+interface WinkLogin extends KeycloakJs {
+  winkInit(params?: WinkInitParams): Promise<void>;
+  winkLogout(params?: WinkLogoutParams): ReturnType<KeycloakJs['logout']>;
+  winkLogin(params?: WinkLoginParams): ReturnType<KeycloakJs['login']>;
 }
 
-interface WinkLoginConfig {
-  url: string;
-  realm: string;
-  clientId: string;
-  onAuthErrorFailure: (error: Error) => void;
-  loggingEnabled: boolean;
+export interface WinkData {
+  id?: string;
+  username?: string;
+  name?: string;
+  surname?: string;
+  phone?: string;
+  email?: string;
+  oid?: string;
+  sub?: string;
+  access_token?: string;
+  access_token_parsed: { exp?: number };
+  access_token_exp?: string;
+  refresh_token?: string;
+  refresh_token_parsed?: KeycloakTokenParsed;
+  refresh_token_exp?: string;
+  id_token?: string;
+  id_token_parsed?: KeycloakTokenParsed;
+  id_token_exp?: string;
 }
 
-function parseJwt(token: string) {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(
-    window
-      .atob(base64)
-      .split('')
-      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-      .join('')
-  );
-  return JSON.parse(jsonPayload);
-}
+const clientId = import.meta.env.VITE_CLIENT_ID;
+const realm = import.meta.env.VITE_REALM;
+const sandbox = 'stagekeycloak';
+
+const winkConfig: WinkKeycloakConfig = {
+  url: `https://${sandbox}.winklogin.com`,
+
+  realm,
+  clientId,
+  loggingEnabled: true, // Change to false in production
+  // eslint-disable-next-line no-console
+  onAuthErrorFailure: (error) => console.error(error), // Pass custom error handler
+};
 
 const useWinkAuth = () => {
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const winkKeycloakClient = useRef<WinkLogin>(
+    window.getWinkLoginClient(winkConfig)
+  );
+  const didInit = useRef(false);
+  const [keycloakData, setKeycloakData] = useState<WinkData | undefined>();
+  const [tokenData, setTokenData] = useState<TokenData | undefined>();
+  const [tokenDataLoading, setTokenDataLoading] = useState(false);
 
-  const [winkClient, setWinkClient] = useState<any | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
-    const clientId = import.meta.env.VITE_CLIENT_ID;
-    const realm = import.meta.env.VITE_REALM;
-    const sandbox = 'stagekeycloak'; // or 'prod' for producción
-    const config: WinkLoginConfig = {
-      url: `https://${sandbox}.winklogin.com`,
-      realm,
-      clientId,
-      onAuthErrorFailure: (error: Error) => console.error(error),
-      loggingEnabled: true,
-    };
+    if (didInit.current) {
+      return;
+    }
 
-    const winkLoginClient = window.getWinkLoginClient(config);
-    setWinkClient(winkLoginClient);
+    didInit.current = true;
 
-    winkLoginClient.winkInit({
+    winkInit({
+      // eslint-disable-next-line no-console
+      onFailure: (error: unknown) => console.error(error),
       onSuccess: () => {
-        const data = parseJwt(winkLoginClient.token);
-        setUserData(data);
+        const {
+          idToken,
+          idTokenParsed,
+          refreshToken,
+          refreshTokenParsed,
+          profile,
+          token,
+        } = winkKeycloakClient.current;
+
+        const accessTokenParsed = parseJwt(token ?? '');
+        const winkData: WinkData = {
+          id: profile?.id,
+          username: profile?.username,
+
+          name: idTokenParsed?.given_name,
+          surname: idTokenParsed?.family_name,
+          phone: idTokenParsed?.phone_number,
+          email: idTokenParsed?.email,
+          oid: idTokenParsed?.oid,
+          sub: idTokenParsed?.sub,
+
+          access_token: token,
+          access_token_parsed: accessTokenParsed,
+          access_token_exp: accessTokenParsed?.exp
+            ? getFormattedTime(accessTokenParsed?.exp)
+            : '',
+
+          refresh_token: refreshToken,
+          refresh_token_parsed: refreshTokenParsed,
+          refresh_token_exp: refreshTokenParsed?.exp
+            ? getFormattedTime(refreshTokenParsed?.exp)
+            : '',
+
+          id_token: idToken,
+          id_token_parsed: idTokenParsed,
+          id_token_exp: idTokenParsed?.exp
+            ? getFormattedTime(idTokenParsed?.exp)
+            : '',
+        };
+
+        setKeycloakData(winkData);
       },
-      onFailure: (error: Error) => console.error(error),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { userData, winkClient };
+  const winkInit = useCallback(
+    async (params?: WinkInitParams) => {
+      await winkKeycloakClient.current.winkInit(params);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [winkKeycloakClient.current]
+  );
+
+  const winkLogin = useCallback(
+    async (params?: WinkLoginParams) => {
+      await winkKeycloakClient.current.winkLogin(params);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [winkKeycloakClient.current]
+  );
+
+  const winkLogout = useCallback(
+    async (params: WinkLogoutParams) => {
+      await winkKeycloakClient.current.winkLogout(params);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [winkKeycloakClient.current]
+  );
+
+  const winkRefreshToken = useCallback(
+    async (minValidity = 5) => {
+      console.log('winkRefreshToken');
+
+      const refreshed = await winkKeycloakClient.current.updateToken(
+        minValidity
+      );
+      if (refreshed) {
+        enqueueSnackbar('Token was successfully refreshed', {
+          variant: 'success',
+        });
+      } else {
+        console.log('Token is still valid');
+
+        enqueueSnackbar('Token is still valid', { variant: 'warning' });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [winkKeycloakClient.current]
+  );
+
+  const parseJwt = (token: string): { exp?: number } => {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split('')
+        .map(function (c) {
+          return `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`;
+        })
+        .join('')
+    );
+
+    return JSON.parse(jsonPayload);
+  };
+
+  const getFormattedTime = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000);
+
+    return date.toLocaleString();
+  };
+
+  const winkValidateToken = useCallback(async () => {
+    const formData = {
+      ClientId: clientId,
+      AccessToken: winkKeycloakClient.current.token,
+      ClientSecret: import.meta.env.VITE_CLIENT_SECRET,
+    };
+
+    try {
+      setTokenDataLoading(true);
+
+      const result = await axios.post<{
+        firstName: string;
+        lastName: string;
+        contactNo: string;
+        email: string;
+        winkTag: string;
+        winkToken: string;
+        dateOfBirth: string;
+        expiryTime: string;
+      }>(
+        'https://stage-api.winklogin.com/api/ConfidentialClient/verify-client',
+        formData
+      );
+      setTokenData(result.data);
+    } catch (error) {
+      enqueueSnackbar(`Failed to validate token: ${error} `, {
+        variant: 'error',
+      });
+    } finally {
+      setTokenDataLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winkKeycloakClient.current.token]);
+
+  return {
+    winkLogin,
+    winkLogout,
+    winkRefreshToken,
+    winkValidateToken,
+    keycloakData,
+    clientId,
+    tokenData,
+    tokenDataLoading,
+  };
 };
 
 export default useWinkAuth;
