@@ -1,10 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState } from 'react';
+
 import { WinkLoginButton, WinkButton } from './winkButton/WinkButton';
+
 import useWinkAuth from './hooks/useWinkAuth';
 
 import './App.css';
 
-function App() {
+const App: React.FC = () => {
+  const [isNotSignedIn, setIsNotSignedIn] = useState<boolean>(true);
+
   const {
     winkLogin,
     winkLogout,
@@ -16,7 +20,13 @@ function App() {
     tokenDataLoading,
   } = useWinkAuth();
 
-  const isNotSignedIn = keycloakData === undefined;
+  useEffect(() => {
+    setIsNotSignedIn(keycloakData === undefined);
+  }, [keycloakData]);
+
+  useEffect(() => {
+    !isNotSignedIn && winkValidateToken();
+  }, [isNotSignedIn, winkValidateToken]);
 
   return (
     <div className='container'>
@@ -152,11 +162,6 @@ function App() {
           />
 
           <WinkButton
-            onClick={(): Promise<void> => winkValidateToken()}
-            text='Validate token'
-          />
-
-          <WinkButton
             onClick={(): Promise<void> => winkRefreshToken()}
             text='Refresh token'
           />
@@ -192,6 +197,6 @@ function App() {
       </div>
     </div>
   );
-}
+};
 
 export default App;
